@@ -53,4 +53,4 @@ README、手順書、PR の説明では別の Claude を 2 回起動するので
 
 ## ライセンス
 
-未定です。
+MIT License です。
