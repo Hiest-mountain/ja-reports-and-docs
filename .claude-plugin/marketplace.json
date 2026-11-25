@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ja-reports-and-docs",
+  "description": "Claude Code marketplace for ja-reports-and-docs",
+  "owner": {
+    "name": "Hiest-mountain"
+  },
+  "plugins": [
+    {
+      "name": "ja-reports-and-docs",
+      "description": "Claude が書く日本語の報告、README、commit メッセージを、作業を見ていない読み手にも自然に読める文にする skill",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/Hiest-mountain/ja-reports-and-docs",
+      "repository": "https://github.com/Hiest-mountain/ja-reports-and-docs",
+      "license": "MIT"
+    }
+  ]
+}

@@ -25,7 +25,20 @@ README や commit メッセージを書かせると、Claude Code がこの skil
 
 ## インストール
 
-このリポジトリを `~/.claude/skills/ja-reports-and-docs/` に配置してください。使用をやめる場合はこのフォルダを削除してください。
+Claude Code のセッションで次の 1 行を実行してください。
+
+```
+/plugin install ja-reports-and-docs --marketplace Hiest-mountain/ja-reports-and-docs
+```
+
+Claude Code が 2.1.275 より古い場合は、次の 2 行を順に実行します。
+
+```
+/plugin marketplace add Hiest-mountain/ja-reports-and-docs
+/plugin install ja-reports-and-docs@ja-reports-and-docs
+```
+
+`/reload-plugins` を実行するか Claude Code を起動し直すと、skill の一覧に `ja-reports-and-docs:ja-reports-and-docs` が表示されます。更新は `/plugin marketplace update ja-reports-and-docs` で受け取れます。使用をやめる場合は `/plugin uninstall ja-reports-and-docs` を実行してください。
 
 この skill が自動で読み込まれないことがある場合は、`~/.claude/CLAUDE.md` に次の 1 行を追加してください。
 

@@ -1,0 +1,11 @@
+{
+  "name": "ja-reports-and-docs",
+  "description": "Claude が書く日本語の報告、README、commit メッセージを、作業を見ていない読み手にも自然に読める文にする skill",
+  "skills": "./skills/",
+  "author": {
+    "name": "Hiest-mountain"
+  },
+  "homepage": "https://github.com/Hiest-mountain/ja-reports-and-docs",
+  "repository": "https://github.com/Hiest-mountain/ja-reports-and-docs",
+  "license": "MIT"
+}
