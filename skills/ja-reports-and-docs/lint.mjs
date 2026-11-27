@@ -59,8 +59,7 @@ const K = '[\\u4E00-\\u9FFF々]';   // 漢字
 const each = (re, str, fn) => { for (const m of str.matchAll(re)) fn(m); };
 
 const WORD_VERB = new RegExp(
-  '始ま|並[ぶびべん]|選[ぶび]|試[すし]|(?<![けり取受差])入れ(?!子)|(?<!' + K + ')置[くいき](?!換)|' +
-  '(?<![きりいみえけ])直[すし]|見比べ|動か|(?<![み' + K.slice(1, -1) + '])立て|起こ|当て|詰め|写[すし]|回[すし]|落と', 'g');
+  '動か|(?<![み' + K.slice(1, -1) + '])立て|起こ|当て|詰め|写[すし]|回[すし]|落と', 'g'); // 意味が複数ある動詞だけ。選ぶ、試す、直すなどは「硬さ」の割合で見る
 const WORD_NOUN = new RegExp('(?<!' + K + ')(物|所|形|辺り)(?!' + K + ')|感じ', 'g');
 const TYPE = /のは|ことを目的|定め|→|—|(もの|仕組み|ツール|スクリプト)(です|である)|分かったこと(です|である)|次のとおり/g;
 const PREVIEW = /(次の|以下の)[^。]*(します|です|である|する)。$/;
@@ -73,7 +72,7 @@ const JOTAI = /(である|ている|ない|した|になる|する|れる|でき
 // 語（表と箇条書きも対象）
 for (const r of rows) {
   if (!['prose', 'list', 'table'].includes(r.kind)) continue;
-  each(WORD_VERB, r.text, m => hit(r.n, '語-動詞', m[0], '動作か操作なら意味の狭い語にする（3.1、3.2）'));
+  each(WORD_VERB, r.text, m => hit(r.n, '語-動詞', m[0], '文書の中で 2 つ以上の意味に使っていれば、意味ごとに一つに決まる語にする（3.1）'));
   each(WORD_NOUN, r.text, m => hit(r.n, '語-名詞', m[0], '指している対象の名前にする（3.1）'));
 }
 // 箇条書きのラベル
@@ -97,11 +96,27 @@ for (const { n, s } of [...sents, ...listSents]) {
   each(WRITER, s, m => hit(n, '書き手', m[0], '読み手にとっての意味に書き換えるか消す（3.7、3.8）'));
   each(SELECT, s, m => hit(n, '選別', m[0], '読み手の操作か判断を変えない文なら削る（1 節）'));
   each(ORDER, s, m => hit(n, '順番', m[0], '否定の側を消して誤解が起きないなら削る。残すなら置く位置を決める（3.6）'));
+  each(/(?:は|が|も|では|には)、([^、。]{1,22}(?:たら|ると|れば|ので|ため|ところ|けれど|のに|ながら|たが|だが)、)/g, s, m =>
+    hit(n, '語順-挿入', m[0], '主題と述語の間に節が挟まっている。節を文頭へ移すか、文を分ける（3.4）'));
 }
 // 段落ごと
 const all = sents.filter(x => /[。]$/.test(x.s));
 const nK = all.filter(x => KEITAI.test(x.s)).length, nJ = all.filter(x => !KEITAI.test(x.s) && JOTAI.test(x.s)).length;
 const style = nK >= nJ ? '敬体' : '常体';
+// 肯定の文と否定の文が隣り合う対。箇条書きの中の文も同じ行の中で見る
+const NEG = /(ない|ません|なかった|ませんでした|未確認(です|である)?|不明(です|である)?)。$/;
+const pairGroups = [...paras.map(p => p.sents), ...listRows.map(r => listSents.filter(x => x.n === r.n))];
+for (const g of pairGroups) for (let i = 1, last = -1; i < g.length; i++) {
+  const a = g[i - 1].s, b = g[i].s, na = NEG.test(a), nb = NEG.test(b);
+  if (na === nb || /ください/.test(a + b) || last === i - 1) continue;
+  last = i;
+  const neg = na ? a : b;
+  // 「〜ではない」で終わるか、両方の文の述語が同じ漢字のとき（分かった、分からない）だけを対とする
+  const pred = x => (x.slice(-12).match(/[一-鿿](?=[^一-鿿]*$)/) || [''])[0];
+  const copula = /(では|じゃ)(ない|ありません|なかった|ありませんでした)。$/.test(neg);
+  if (!copula && !(pred(a) && pred(a) === pred(b))) continue;
+  if ([...neg].length <= 40) hit(g[i - 1].n, '肯定と否定の対', `${a.slice(-14)} ${b.slice(0, 18)}`, '否定の文を消して読む。誤解が起きなければ消す。残すなら 3.6 の表の形に書き直す（3.6）');
+}
 for (const p of paras) {
   if (p.bold >= 2) hit(p.n, '太字', `太字 ${p.bold} 箇所`, '1 段落に 1 箇所までにする（3.4）');
   let run = [], masu = [];
@@ -122,10 +137,28 @@ for (const p of paras) {
 const lead = paras[0];
 if (lead && lead.heading === '(冒頭)' && lead.sents.length > 3) hit(lead.n, '冒頭', `${lead.sents.length} 文`, '冒頭は 3 文まで。ほかは後ろの節へ移す（2 節）');
 
+// 述語の硬さ。漢語サ変（使用する）と和語の動詞（使う）の割合を数える。正規表現による近似
+const SAHEN = /[一-鿿]{2,}(する|します|して|した|しま|でき|され|させ|し、|しな)/g;
+const WAGO = /[一-鿿][ぁ-ん]{0,2}(う|く|ぐ|す|つ|ぬ|ぶ|む|る|います|きます|ります|えます|って|いて|んで|った|いた|んだ|えて|けて|めて|れて|せて)(?![ぁ-ん]*する)/g;
+let nSahen = 0, nWago = 0;
+for (const { n, s } of [...sents, ...listSents]) {
+  const k = (s.match(SAHEN) || []).length;
+  nSahen += k; nWago += (s.match(WAGO) || []).length;
+  if (k >= 3) hit(n, '硬さ', `漢語サ変 ${k} 個: ${s.slice(0, 20)}…`, '意味が一つに決まる箇所は和語に戻す（使用する→使う、選択する→選ぶ、変更する→変える）（3.2）');
+}
+const stems = {};
+for (const { s } of [...sents, ...listSents, ...rows.filter(r => r.kind === 'table').map(r => ({ s: r.text }))])
+  for (const m of s.matchAll(/([一-鿿]{2})(?:する|します|して|した|でき|され)/g)) stems[m[1]] = (stems[m[1]] || 0) + 1;
+for (const [w, c] of Object.entries(stems)) if (c >= 4) hit(1, '硬さ', `「${w}する」が ${c} 回`, '同じ漢語の述語が続いている。半分を和語にする（3.2）');
+const rate = nSahen + nWago >= 15 ? Math.round(nSahen / (nSahen + nWago) * 100) : null;
+if (rate !== null && rate > 45) hit(1, '硬さ', `漢語サ変の割合 ${rate}%`, '文書全体が硬い。意味が一つに決まる述語を和語に戻して 30〜40% にする（3.2）');
+if (rate !== null && rate < 20 && rows.some(r => r.kind === 'heading')) hit(1, '硬さ', `漢語サ変の割合 ${rate}%`, '文書全体が話し言葉に寄っている。ソフトウェアの動作と操作を表す述語を意味の狭い語にする（3.2）');
+
 // ---- 出力 ----
 hits.sort((a, b) => a.n - b.n || a.code.localeCompare(b.code));
 for (const h of hits) console.log(`L${h.n}\t${h.code}\t${h.frag}\t${h.hint}`);
 const count = {};
 for (const h of hits) count[h.code] = (count[h.code] || 0) + 1;
 console.log(`\n文体: ${style}（敬体 ${nK} 文、常体 ${nJ} 文）  文 ${sents.length}  候補 ${hits.length}`);
+if (rate !== null) console.log(`漢語サ変の割合 ${rate}%（人が書いた README 6 本は 31〜42%）`);
 console.log(Object.entries(count).map(([k, v]) => `${k} ${v}`).join(' / ') || '候補なし');
